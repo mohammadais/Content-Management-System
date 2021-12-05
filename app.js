@@ -1,91 +1,95 @@
-const express = require('express');
+import express, { static } from 'express';
 const app = express();
-const path = require('path')
-const exphbs= require('express-handlebars');
-const mongoose = require('mongoose');
-const bodyParser = require('body-parser');
-const methodOverride = require('method-override');
-const upload = require('express-fileupload');
-const session = require('express-session');
-const flash = require('connect-flash');
-const {mongoDbUrl} = require('./config/config');
-const passport = require('passport');
-mongoose.set('useCreateIndex', true);
-mongoose.set('useFindAndModify', false);
+import { join } from 'path';
+import exphbs from 'express-handlebars';
+import { set, Promise, connect } from 'mongoose';
+import { urlencoded, json } from 'body-parser';
+import methodOverride from 'method-override';
+import upload from 'express-fileupload';
+import session from 'express-session';
+import flash from 'connect-flash';
+import { mongoDbUrl } from './config/config';
+import { initialize, session as _session } from 'passport';
 
+//Load Routes
+import home from './routes/home/index';
+import admin from './routes/admin/index';
+import posts from './routes/admin/posts';
+import categories from './routes/admin/categories';
+import comments from './routes/admin/comments';
+import profile from './routes/admin/profile';
 
-mongoose.Promise = global.Promise;
+set('useCreateIndex', true);
+set('useFindAndModify', false);
 
-mongoose.connect(mongoDbUrl).then(db =>{
+Promise = global.Promise;
 
+connect(mongoDbUrl)
+  .then((db) => {
     console.log('MONGO CONNECTED');
+  })
+  .catch((error) => console.log('not connected'));
 
-}).catch(error => console.log('not connected'));
+app.use(static(join(__dirname, 'public')));
 
+import { select, generateTime, paginate } from './helpers/handlebars-helpers';
 
-app.use(express.static(path.join(__dirname,'public')));
-
-const {select,generateTime,paginate}=require('./helpers/handlebars-helpers');
-
-const Handlebars = require('handlebars');
-const {allowInsecurePrototypeAccess} = require('@handlebars/allow-prototype-access')
+import Handlebars from 'handlebars';
+import { allowInsecurePrototypeAccess } from '@handlebars/allow-prototype-access';
 const insecureHandlebars = allowInsecurePrototypeAccess(Handlebars);
- 
-app.engine('handlebars', exphbs({handlebars: allowInsecurePrototypeAccess(Handlebars),helpers:{select:select,generateTime:generateTime,paginate:paginate}}));
+
+app.engine(
+  'handlebars',
+  exphbs({
+    handlebars: allowInsecurePrototypeAccess(Handlebars),
+    helpers: { select: select, generateTime: generateTime, paginate: paginate }
+  })
+);
 app.set('view engine', 'handlebars');
 
 //to upload files
 app.use(upload());
 
 //Body parser
-app.use(bodyParser.urlencoded({extended:false}));
-app.use(bodyParser.json());
+app.use(urlencoded({ extended: false }));
+app.use(json());
 
 //session
-
-app.use(session({
+app.use(
+  session({
     secret: 'adil',
     resave: true,
     saveUninitialized: true
-  }));  
+  })
+);
 
 app.use(flash());
 
-app.use(passport.initialize());
-app.use(passport.session());
+app.use(initialize());
+app.use(_session());
 
 // local variables using middleware
-app.use((req, res,next)=>{
+app.use((req, res, next) => {
+  res.locals.user = req.user || null;
 
-    res.locals.user = req.user || null;
-
-    res.locals.success_message = req.flash('success_message');
-    res.locals.error_message = req.flash('error_message');
-    res.locals.error = req.flash('error');
-    next();
-
+  res.locals.success_message = req.flash('success_message');
+  res.locals.error_message = req.flash('error_message');
+  res.locals.error = req.flash('error');
+  next();
 });
 
 //method-overrides
-
 app.use(methodOverride('_method'));
 
-
-//Load Routes
-const home  = require('./routes/home/index');
-const admin = require('./routes/admin/index');
-const posts = require('./routes/admin/posts');
-const categories = require('./routes/admin/categories');
-const comments = require('./routes/admin/comments');
-const profile = require('./routes/admin/profile');
 //use Routes
-app.use('/',home);
-app.use('/admin',admin);
-app.use('/admin/posts',posts);
-app.use('/admin/categories',categories);
-app.use('/admin/comments',comments);
-app.use('/admin/profile',profile);
+app.use('/', home);
+app.use('/admin', admin);
+app.use('/admin/posts', posts);
+app.use('/admin/categories', categories);
+app.use('/admin/comments', comments);
+app.use('/admin/profile', profile);
 
-app.listen(3000,()=>{
-    console.log('listening....');
+const port = process.env.PORT || 3000;
+app.listen(port, () => {
+  console.log(`listening on port ${port}...`);
 });
